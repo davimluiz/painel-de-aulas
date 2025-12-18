@@ -2,7 +2,6 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Aula, Anuncio, DataContextType } from '../types';
 
-// Configurações do GitHub (Devem ser configuradas no Vercel Environment Variables)
 const GITHUB_TOKEN = (import.meta as any).env?.VITE_GITHUB_TOKEN || '';
 const GITHUB_OWNER = (import.meta as any).env?.VITE_GITHUB_OWNER || '';
 const GITHUB_REPO = (import.meta as any).env?.VITE_GITHUB_REPO || '';
@@ -16,17 +15,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Helper para buscar arquivos do GitHub API
   const getFileFromGithub = async (path: string) => {
+    if (!GITHUB_TOKEN || !GITHUB_OWNER) return null;
     const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`;
     const res = await fetch(url, {
       headers: { Authorization: `token ${GITHUB_TOKEN}` }
     });
-    if (!res.ok) return null;
+    if (res.status === 404) return { isNew: true };
+    if (!res.ok) throw new Error('Erro ao acessar GitHub');
     return await res.json();
   };
 
-  // Helper para commitar arquivos no GitHub
   const commitToGithub = async (path: string, contentBase64: string, message: string, sha?: string) => {
     const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`;
     const res = await fetch(url, {
@@ -47,43 +46,53 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      // Busca db.json diretamente via Raw URL para evitar cache de API ou via API para pegar o SHA
+      if (!GITHUB_TOKEN) {
+        setError("Token do GitHub não configurado. Verifique o seu .env");
+        setLoading(false);
+        return;
+      }
+
       const fileData = await getFileFromGithub(DB_PATH);
       if (fileData && fileData.content) {
         const decoded = JSON.parse(atob(fileData.content));
         setAulas(decoded.aulas || []);
         setAnuncios(decoded.anuncios || []);
+      } else if (fileData?.isNew) {
+        // Inicializa se for novo
+        setAulas([]);
+        setAnuncios([]);
       }
       setError(null);
     } catch (err) {
       console.error(err);
-      setError("Erro ao carregar dados do GitHub. Verifique as variáveis de ambiente.");
+      setError("Falha na conexão com GitHub. Verifique as credenciais.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (GITHUB_TOKEN && GITHUB_OWNER && GITHUB_REPO) {
-      fetchData();
-    } else {
-      setError("Variáveis do GitHub não configuradas.");
-      setLoading(false);
-    }
+    fetchData();
   }, [fetchData]);
 
   const saveDatabase = async (newAulas: Aula[], newAnuncios: Anuncio[]) => {
-    const fileData = await getFileFromGithub(DB_PATH);
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify({ aulas: newAulas, anuncios: newAnuncios }, null, 2))));
-    await commitToGithub(DB_PATH, content, "Update database", fileData?.sha);
-    setAulas(newAulas);
-    setAnuncios(newAnuncios);
+    setLoading(true);
+    try {
+      const fileData = await getFileFromGithub(DB_PATH);
+      const content = btoa(unescape(encodeURIComponent(JSON.stringify({ aulas: newAulas, anuncios: newAnuncios }, null, 2))));
+      await commitToGithub(DB_PATH, content, "Update database", fileData?.sha);
+      setAulas(newAulas);
+      setAnuncios(newAnuncios);
+    } catch (e) {
+      alert("Erro ao salvar no GitHub.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addAula = useCallback(async (aula: Omit<Aula, 'id'>) => {
     const novaAula = { ...aula, id: Date.now().toString() };
-    const updated = [...aulas, novaAula];
-    await saveDatabase(updated, anuncios);
+    await saveDatabase([...aulas, novaAula], anuncios);
   }, [aulas, anuncios]);
 
   const updateAulasFromCSV = useCallback(async (data: Omit<Aula, 'id'>[]) => {
@@ -110,29 +119,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const addAnuncio = useCallback(async (anuncio: Omit<Anuncio, 'id'>) => {
     const filename = `ad_${Date.now()}.${anuncio.type === 'video' ? 'mp4' : 'png'}`;
     const path = `public/media/${filename}`;
-    
-    // anuncio.src aqui é o base64
     const base64Data = anuncio.src.split(',')[1];
     
     setLoading(true);
     const ok = await commitToGithub(path, base64Data, `Add ad: ${filename}`);
     if (ok) {
-      const newAd = { 
-        id: Date.now().toString(), 
-        type: anuncio.type, 
-        src: `./media/${filename}` // Caminho relativo para o deploy
-      };
+      const newAd = { id: Date.now().toString(), type: anuncio.type, src: `./media/${filename}` };
       await saveDatabase(aulas, [...anuncios, newAd]);
     }
     setLoading(false);
   }, [aulas, anuncios]);
 
   const deleteAnuncio = useCallback(async (id: string) => {
-    const adToDelete = anuncios.find(a => a.id === id);
-    if (!adToDelete) return;
-
-    // Nota: Deletar o arquivo físico no GitHub via API requer o SHA do arquivo.
-    // Por simplicidade, vamos remover apenas a referência no db.json.
     const updatedAds = anuncios.filter(a => a.id !== id);
     await saveDatabase(aulas, updatedAds);
   }, [aulas, anuncios]);
