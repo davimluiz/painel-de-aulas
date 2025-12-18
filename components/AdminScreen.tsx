@@ -27,13 +27,13 @@ const AulaItem: React.FC<{ aula: Aula, onUpdate: (id: string, data: Partial<Aula
         </div>
     );
     return (
-        <div className="grid grid-cols-6 gap-2 bg-white/5 p-4 rounded-lg items-center hover:bg-white/10 border border-white/5">
+        <div className="grid grid-cols-6 gap-2 bg-white/5 p-4 rounded-lg items-center hover:bg-white/10 border border-white/5 transition-all">
             <div className="text-xs text-white/70 font-mono">{aula.data}</div>
-            <div className="text-xs text-[#ff6600] font-bold">{aula.inicio} - {aula.fim} <span className="text-white/30 font-normal text-[10px]">({aula.turno})</span></div>
+            <div className="text-xs text-[#ff6600] font-bold">{aula.inicio} - {aula.fim} <span className="text-white/30 font-normal text-[10px] uppercase">({aula.turno})</span></div>
             <div className="text-xs font-bold text-white truncate">{aula.turma}</div>
             <div className="text-xs text-white/80 truncate">{aula.sala}</div>
             <div className="text-xs text-white/60 truncate">{aula.instrutor}</div>
-            <div className="flex gap-2 justify-end"><button onClick={() => setIsEditing(true)} className="text-[#ff6600] text-xs font-bold uppercase">Editar</button><button onClick={() => onDelete(aula.id)} className="text-red-500"><TrashIcon className="w-4 h-4" /></button></div>
+            <div className="flex gap-2 justify-end"><button onClick={() => setIsEditing(true)} className="text-[#ff6600] text-xs font-bold uppercase hover:text-white transition-colors">Editar</button><button onClick={() => onDelete(aula.id)} className="text-red-500 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button></div>
         </div>
     );
 };
@@ -44,7 +44,6 @@ const AdminPanel: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     const [filterStart, setFilterStart] = useState('');
     const [filterEnd, setFilterEnd] = useState('');
     
-    // States para Uploads
     const [selectedCsvFile, setSelectedCsvFile] = useState<File | null>(null);
     const [adPreview, setAdPreview] = useState<{ src: string, type: 'image'|'video' } | null>(null);
 
@@ -73,16 +72,19 @@ const AdminPanel: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         if (!selectedCsvFile) return;
         const reader = new FileReader();
         reader.onload = (event) => {
-            const rows = (event.target?.result as string).split('\n').filter(r => r.trim() !== '');
-            rows.shift();
-            const data = rows.map(r => {
-                const v = r.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
-                if (v.length < 5) return null;
-                return { data: v[0], sala: v[1], turma: v[2], instrutor: v[3], unidade_curricular: v[4], inicio: v[5] || '08:00', fim: v[6] || '12:00', turno: calcularTurno(v[5]) };
-            }).filter((i): i is any => i !== null);
-            context?.updateAulasFromCSV(data);
-            setSelectedCsvFile(null);
-            alert("CSV enviado com sucesso!");
+            try {
+                const rows = (event.target?.result as string).split('\n').filter(r => r.trim() !== '');
+                rows.shift();
+                const data = rows.map(r => {
+                    const v = r.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+                    if (v.length < 5) return null;
+                    return { data: v[0], sala: v[1], turma: v[2], instrutor: v[3], unidade_curricular: v[4], inicio: v[5] || '08:00', fim: v[6] || '12:00', turno: calcularTurno(v[5]) };
+                }).filter((i): i is any => i !== null);
+                context?.updateAulasFromCSV(data);
+                setSelectedCsvFile(null);
+            } catch (err) {
+                alert("Erro ao processar o conteúdo do CSV.");
+            }
         };
         reader.readAsText(selectedCsvFile, 'UTF-8');
     };
@@ -99,79 +101,87 @@ const AdminPanel: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         if (!adPreview) return;
         context?.addAnuncio(adPreview);
         setAdPreview(null);
-        alert("Anúncio enviado com sucesso!");
     };
 
     if (!context) return null;
 
     return (
-        <div className="min-h-screen bg-[#0b0b0f] text-white p-6 lg:p-10">
+        <div className="min-h-screen bg-[#0b0b0f] text-white p-6 lg:p-10 font-sans">
             {context.loading && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center">
-                    <div className="text-center">
-                        <div className="w-12 h-12 border-4 border-[#ff6600] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-white font-bold animate-pulse">Sincronizando com GitHub...</p>
-                    </div>
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-xl z-[100] flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 border-4 border-[#ff6600] border-t-transparent rounded-full animate-spin mb-6"></div>
+                    <p className="text-[#ff6600] font-black text-xl tracking-widest animate-pulse">SINCRONIZANDO GITHUB</p>
+                    <p className="text-white/40 text-sm mt-2">Aguarde enquanto os dados são atualizados no repositório.</p>
                 </div>
             )}
 
-            <header className="flex justify-between items-center mb-10">
+            <header className="flex justify-between items-center mb-12">
                 <div>
-                    <h1 className="text-4xl font-black tracking-tighter text-white">ADMIN<span className="text-[#ff6600]">PAINEL</span></h1>
-                    <p className="text-white/40 text-sm">Gerenciamento de aulas e mídia</p>
+                    <h1 className="text-5xl font-black tracking-tighter text-white uppercase italic">Painel<span className="text-[#ff6600]">Admin</span></h1>
+                    <p className="text-white/40 text-xs mt-1 uppercase tracking-widest font-bold">Gerenciador de Aulas e Publicidade</p>
                 </div>
-                <button onClick={onLogout} className="flex items-center gap-2 bg-white/5 hover:bg-red-500/20 px-4 py-2 rounded-xl border border-white/10 transition-all text-white/60 hover:text-red-400">
-                    <LogOutIcon className="w-5 h-5"/> Sair
+                <button onClick={onLogout} className="flex items-center gap-3 bg-white/5 hover:bg-red-500/10 px-6 py-3 rounded-2xl border border-white/10 transition-all text-white/50 hover:text-red-500 group">
+                    <LogOutIcon className="w-5 h-5 transition-transform group-hover:-translate-x-1"/> 
+                    <span className="font-bold uppercase text-xs tracking-widest">Sair</span>
                 </button>
             </header>
             
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Lado Esquerdo: Uploads */}
-                <div className="lg:col-span-5 space-y-8">
-                    {/* CSV Upload */}
-                    <div className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-                        <h2 className="text-[#ff6600] text-xl font-bold mb-6 flex items-center gap-3"><FileTextIcon /> Planilha de Aulas</h2>
-                        <div className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all ${selectedCsvFile ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-[#ff6600]/50'}`}>
-                            <input type="file" accept=".csv" onChange={handleCsvFileSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
-                            <UploadCloudIcon className={`w-12 h-12 mx-auto mb-3 ${selectedCsvFile ? 'text-green-400' : 'text-white/20'}`} />
-                            <p className="text-sm font-medium">{selectedCsvFile ? selectedCsvFile.name : 'Selecionar arquivo CSV'}</p>
-                            <p className="text-[10px] text-white/30 mt-1">Clique para buscar no computador</p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                {/* Lado Esquerdo: Uploads de Arquivo */}
+                <div className="lg:col-span-5 space-y-10">
+                    
+                    {/* CSV Uploader */}
+                    <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[2rem] border border-white/10 shadow-3xl relative overflow-hidden group">
+                        <div className="absolute top-0 left-0 w-2 h-full bg-[#ff6600] opacity-50"></div>
+                        <h2 className="text-white text-xl font-black mb-6 flex items-center gap-3 uppercase italic"><FileTextIcon className="text-[#ff6600]"/> Importar Planilha (CSV)</h2>
+                        
+                        <div className={`relative border-2 border-dashed rounded-3xl p-10 text-center transition-all duration-500 ${selectedCsvFile ? 'border-green-500/50 bg-green-500/5' : 'border-white/10 hover:border-[#ff6600]/50 hover:bg-white/5'}`}>
+                            <input type="file" accept=".csv" onChange={handleCsvFileSelect} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                            <UploadCloudIcon className={`w-16 h-16 mx-auto mb-4 transition-all duration-500 ${selectedCsvFile ? 'text-green-400 scale-110' : 'text-white/10'}`} />
+                            <p className="text-sm font-bold uppercase tracking-tight">{selectedCsvFile ? selectedCsvFile.name : 'Clique para buscar CSV'}</p>
+                            <p className="text-[10px] text-white/20 mt-2 uppercase">Somente arquivos .csv com codificação UTF-8</p>
                         </div>
+                        
                         {selectedCsvFile && (
-                            <button onClick={processCSV} className="w-full mt-4 bg-[#ff6600] hover:bg-[#e65c00] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-orange-900/20 flex items-center justify-center gap-2">
-                                <UploadCloudIcon className="w-5 h-5"/> Enviar Aulas
+                            <button onClick={processCSV} className="w-full mt-6 bg-[#ff6600] hover:bg-[#ff8533] text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-orange-950/40 flex items-center justify-center gap-3 uppercase text-sm tracking-widest active:scale-[0.98]">
+                                <UploadCloudIcon className="w-5 h-5"/> Enviar Aulas agora
                             </button>
                         )}
                     </div>
 
-                    {/* Media Upload */}
-                    <div className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-                        <h2 className="text-[#ff6600] text-xl font-bold mb-6 flex items-center gap-3"><CameraIcon /> Banner de Anúncio</h2>
-                        <div className={`relative border-2 border-dashed rounded-2xl p-6 text-center transition-all ${adPreview ? 'border-[#ff6600]/50 bg-orange-500/5' : 'border-white/10 hover:border-[#ff6600]/50'}`}>
-                            <input type="file" accept="image/*,video/*" onChange={handleAdSelect} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    {/* Media Uploader */}
+                    <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[2rem] border border-white/10 shadow-3xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-2 h-full bg-[#ff6600] opacity-50"></div>
+                        <h2 className="text-white text-xl font-black mb-6 flex items-center gap-3 uppercase italic"><CameraIcon className="text-[#ff6600]"/> Novo Anúncio de Mídia</h2>
+                        
+                        <div className={`relative border-2 border-dashed rounded-3xl p-10 text-center transition-all duration-500 ${adPreview ? 'border-[#ff6600]/50 bg-orange-500/5' : 'border-white/10 hover:border-[#ff6600]/50 hover:bg-white/5'}`}>
+                            <input type="file" accept="image/*,video/*" onChange={handleAdSelect} className="absolute inset-0 opacity-0 cursor-pointer z-10" />
                             {adPreview ? (
-                                <div className="h-24 w-full flex items-center justify-center overflow-hidden rounded-lg bg-black/40">
+                                <div className="h-32 w-full flex items-center justify-center overflow-hidden rounded-2xl bg-black/60 border border-white/10">
                                     {adPreview.type === 'image' ? <img src={adPreview.src} className="h-full object-contain" /> : <video src={adPreview.src} className="h-full" />}
                                 </div>
                             ) : (
                                 <>
-                                    <CameraIcon className="w-12 h-12 mx-auto mb-3 text-white/20" />
-                                    <p className="text-sm font-medium">Selecionar Imagem ou Vídeo</p>
+                                    <CameraIcon className="w-16 h-16 mx-auto mb-4 text-white/10" />
+                                    <p className="text-sm font-bold uppercase tracking-tight">Buscar Imagem ou Vídeo</p>
+                                    <p className="text-[10px] text-white/20 mt-2 uppercase">PNG, JPG ou MP4 (Máx 4 anúncios)</p>
                                 </>
                             )}
                         </div>
+                        
                         {adPreview && (
-                            <button onClick={processAd} className="w-full mt-4 bg-[#ff6600] hover:bg-[#e65c00] text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-orange-900/20">
-                                Enviar Anúncio
+                            <button onClick={processAd} className="w-full mt-6 bg-[#ff6600] hover:bg-[#ff8533] text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-orange-950/40 uppercase text-sm tracking-widest active:scale-[0.98]">
+                                Confirmar e Enviar
                             </button>
                         )}
                         
-                        <div className="grid grid-cols-4 gap-3 mt-6">
+                        {/* Listagem mini de anúncios */}
+                        <div className="grid grid-cols-4 gap-4 mt-8">
                             {context.anuncios.map(a => (
-                                <div key={a.id} className="relative aspect-video bg-black/40 rounded-xl overflow-hidden group border border-white/5">
+                                <div key={a.id} className="relative aspect-video bg-black/40 rounded-xl overflow-hidden group border border-white/5 ring-1 ring-white/5">
                                     {a.type === 'image' ? <img src={a.src} className="object-cover w-full h-full" /> : <video src={a.src} className="w-full h-full" />}
-                                    <button onClick={() => context.deleteAnuncio(a.id)} className="absolute inset-0 flex items-center justify-center bg-red-600/80 opacity-0 group-hover:opacity-100 transition-all">
-                                        <TrashIcon className="w-5 h-5 text-white" />
+                                    <button onClick={() => context.deleteAnuncio(a.id)} className="absolute inset-0 flex items-center justify-center bg-red-600/90 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                        <TrashIcon className="w-6 h-6 text-white" />
                                     </button>
                                 </div>
                             ))}
@@ -179,36 +189,55 @@ const AdminPanel: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
                     </div>
                 </div>
 
-                {/* Lado Direito: Listagem e Manual */}
-                <div className="lg:col-span-7 space-y-8">
-                    <div className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-                        <h2 className="text-[#ff6600] text-xl font-bold mb-6 flex items-center gap-3"><PlusCircleIcon /> Lançamento Manual</h2>
-                        <form onSubmit={e => { e.preventDefault(); context.addAula(newAula); }} className="grid grid-cols-2 gap-4">
-                            <input value={newAula.data} onChange={e => setNewAula({...newAula, data: e.target.value})} placeholder="Data (DD/MM/YYYY)" className="bg-white/5 border border-white/10 p-3 rounded-xl text-sm" />
-                            <input value={newAula.turma} onChange={e => setNewAula({...newAula, turma: e.target.value})} placeholder="Turma" className="bg-white/5 border border-white/10 p-3 rounded-xl text-sm" />
-                            <input value={newAula.sala} onChange={e => setNewAula({...newAula, sala: e.target.value})} placeholder="Sala / Ambiente" className="col-span-2 bg-white/5 border border-white/10 p-3 rounded-xl text-sm" />
-                            <input type="time" value={newAula.inicio} onChange={e => setNewAula({...newAula, inicio: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl text-sm" />
-                            <input type="time" value={newAula.fim} onChange={e => setNewAula({...newAula, fim: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl text-sm" />
-                            <button type="submit" className="col-span-2 bg-green-600 hover:bg-green-500 p-3 rounded-xl font-bold transition-colors">Cadastrar Aula</button>
+                {/* Lado Direito: Listagem e Cadastro Manual */}
+                <div className="lg:col-span-7 space-y-10">
+                    
+                    {/* Manual Form */}
+                    <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[2rem] border border-white/10 shadow-3xl">
+                        <h2 className="text-[#ff6600] text-xl font-black mb-6 flex items-center gap-3 uppercase italic"><PlusCircleIcon /> Lançamento Rápido</h2>
+                        <form onSubmit={e => { e.preventDefault(); context.addAula(newAula); }} className="grid grid-cols-2 gap-5">
+                            <input value={newAula.data} onChange={e => setNewAula({...newAula, data: e.target.value})} placeholder="Data (DD/MM/YYYY)" className="bg-white/5 border border-white/10 p-4 rounded-2xl text-sm focus:border-[#ff6600] outline-none transition-all" />
+                            <input value={newAula.turma} onChange={e => setNewAula({...newAula, turma: e.target.value})} placeholder="Identificação da Turma" className="bg-white/5 border border-white/10 p-4 rounded-2xl text-sm focus:border-[#ff6600] outline-none transition-all" />
+                            <input value={newAula.sala} onChange={e => setNewAula({...newAula, sala: e.target.value})} placeholder="Ambiente / Laboratório" className="col-span-2 bg-white/5 border border-white/10 p-4 rounded-2xl text-sm focus:border-[#ff6600] outline-none transition-all" />
+                            <div className="flex gap-4 col-span-2">
+                                <input type="time" value={newAula.inicio} onChange={e => setNewAula({...newAula, inicio: e.target.value})} className="w-1/2 bg-white/5 border border-white/10 p-4 rounded-2xl text-sm focus:border-[#ff6600] outline-none transition-all" />
+                                <input type="time" value={newAula.fim} onChange={e => setNewAula({...newAula, fim: e.target.value})} className="w-1/2 bg-white/5 border border-white/10 p-4 rounded-2xl text-sm focus:border-[#ff6600] outline-none transition-all" />
+                            </div>
+                            <button type="submit" className="col-span-2 bg-green-600 hover:bg-green-500 p-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg shadow-green-950/20 active:scale-95">Salvar Registro</button>
                         </form>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                            <h2 className="font-bold text-[#ff6600] text-xl">Aulas Registradas</h2>
-                            <div className="flex gap-2 items-center bg-black/40 p-2 rounded-xl border border-white/10">
-                                <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-transparent text-[10px] text-white outline-none" />
-                                <span className="text-white/20">-</span>
-                                <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-transparent text-[10px] text-white outline-none" />
-                                {(filterStart || filterEnd) && <button onClick={() => { setFilterStart(''); setFilterEnd(''); }} className="text-white/40 hover:text-white"><XIcon className="w-3 h-3" /></button>}
+                    {/* Listagem */}
+                    <div className="bg-white/5 backdrop-blur-2xl p-8 rounded-[2rem] border border-white/10 shadow-3xl">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                            <h2 className="font-black text-[#ff6600] text-xl uppercase italic">Registros no Sistema</h2>
+                            <div className="flex gap-3 items-center bg-black/40 p-3 rounded-2xl border border-white/10">
+                                <span className="text-[10px] font-black uppercase text-white/30 ml-2">Período</span>
+                                <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-transparent text-[10px] text-white outline-none font-bold cursor-pointer" />
+                                <span className="text-white/10">—</span>
+                                <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-transparent text-[10px] text-white outline-none font-bold cursor-pointer" />
+                                {(filterStart || filterEnd) && (
+                                    <button onClick={() => { setFilterStart(''); setFilterEnd(''); }} className="text-white/40 hover:text-white transition-colors bg-white/5 p-1 rounded-md">
+                                        <XIcon className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
                         </div>
-                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                        
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-3 custom-scrollbar">
                             {sortedAulas.length === 0 ? (
-                                <p className="text-white/20 text-center py-10 italic">Nenhum registro para o período.</p>
+                                <div className="text-center py-20 border-2 border-dashed border-white/5 rounded-3xl">
+                                    <p className="text-white/20 text-sm italic font-medium uppercase tracking-widest">Nenhuma aula encontrada para esta busca.</p>
+                                </div>
                             ) : (
                                 sortedAulas.map(a => <AulaItem key={a.id} aula={a} onUpdate={context.updateAula} onDelete={context.deleteAula} />)
                             )}
+                        </div>
+                        
+                        <div className="mt-8 pt-6 border-t border-white/5 flex justify-end">
+                            <button onClick={context.clearAulas} className="text-red-500/60 hover:text-red-500 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-colors">
+                                <TrashIcon className="w-4 h-4" /> Apagar Tudo
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -221,20 +250,23 @@ const AdminScreen: React.FC<{ onReturnToDashboard: () => void }> = ({ onReturnTo
     const [auth, setAuth] = useState(false);
     const [user, setUser] = useState('');
     const [pass, setPass] = useState('');
+    
     if (auth) return <AdminPanel onLogout={onReturnToDashboard} />;
+    
     return (
-        <div className="h-screen w-screen bg-[#060608] flex items-center justify-center p-6">
-             <button onClick={onReturnToDashboard} className="fixed top-8 left-8 text-white/30 hover:text-[#ff6600] transition-colors font-bold uppercase tracking-widest text-xs flex items-center gap-2">
-                <LogOutIcon className="w-4 h-4 rotate-180" /> Voltar ao Painel
+        <div className="h-screen w-screen bg-[#060608] flex items-center justify-center p-6 font-sans">
+             <button onClick={onReturnToDashboard} className="fixed top-10 left-10 text-white/20 hover:text-[#ff6600] transition-all font-black uppercase tracking-[0.2em] text-[10px] flex items-center gap-3 group">
+                <LogOutIcon className="w-5 h-5 rotate-180 transition-transform group-hover:-translate-x-1" /> Voltar ao Painel
              </button>
-            <div className="bg-white/5 p-10 rounded-[2.5rem] border border-white/10 w-full max-w-md shadow-2xl backdrop-blur-2xl">
-                <div className="text-center mb-8">
-                    <h2 className="text-3xl font-black text-white mb-2">ACESSO</h2>
-                    <div className="h-1 w-12 bg-[#ff6600] mx-auto rounded-full"></div>
+            <div className="bg-white/5 p-12 rounded-[3rem] border border-white/10 w-full max-w-md shadow-4xl backdrop-blur-3xl relative overflow-hidden">
+                <div className="absolute -top-24 -right-24 w-48 h-48 bg-[#ff6600] blur-[100px] opacity-20"></div>
+                <div className="text-center mb-10">
+                    <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">Login<span className="text-[#ff6600]">Admin</span></h2>
+                    <div className="h-1.5 w-16 bg-[#ff6600] mx-auto rounded-full mt-2"></div>
                 </div>
-                <input value={user} onChange={e => setUser(e.target.value)} placeholder="Usuário" className="w-full bg-white/5 p-4 rounded-2xl mb-4 text-white border border-white/10 focus:border-[#ff6600]/50 outline-none transition-all" />
-                <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Senha" className="w-full bg-white/5 p-4 rounded-2xl mb-8 text-white border border-white/10 focus:border-[#ff6600]/50 outline-none transition-all" />
-                <button onClick={() => (user === 'admin' && pass === '1234') && setAuth(true)} className="w-full bg-[#ff6600] p-4 rounded-2xl font-bold text-white hover:bg-[#e65c00] transition-all shadow-xl shadow-orange-900/20 active:scale-95">ENTRAR NO SISTEMA</button>
+                <input value={user} onChange={e => setUser(e.target.value)} placeholder="Usuário" className="w-full bg-white/5 p-5 rounded-2xl mb-4 text-white border border-white/10 focus:border-[#ff6600]/40 outline-none transition-all font-bold placeholder:text-white/10" />
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="Senha de Acesso" className="w-full bg-white/5 p-5 rounded-2xl mb-10 text-white border border-white/10 focus:border-[#ff6600]/40 outline-none transition-all font-bold placeholder:text-white/10" />
+                <button onClick={() => (user === 'admin' && pass === '1234') && setAuth(true)} className="w-full bg-[#ff6600] p-5 rounded-2xl font-black text-white hover:bg-[#ff8533] transition-all shadow-2xl shadow-orange-950/40 uppercase tracking-widest text-xs active:scale-95">Autenticar agora</button>
             </div>
         </div>
     );
